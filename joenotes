@@ -1,0 +1,7 @@
+/home/genome/joseph7e/gene_16S/organism_tax.csv << make D3 phylogenetic tree
+	- organism_class.txt has the class names
+
+/home/genome/joseph7e/python_scripts << clean up the code
+	- gene_extractor takes gene name and extracts (change "16S" to any arg)
+
+combine pipeline for uclust/script that happens after uclust
