@@ -62,17 +62,17 @@ class ClustData:
 		self.count_100pcent = 0	# number of member with 100.0%
 
 
-usageMsg = '''
-Usage: genomePharser fastafile
-		Read a fasta file(result_aligned.fasta)and output each block that 
-		contains more than one genome into a separate file labelled on the cluster 
-		number from original file.
-'''
+# usageMsg = '''
+# Usage: genomePharser fastafile
+# 		Read a fasta file(result_aligned.fasta)and output each block that 
+# 		contains more than one genome into a separate file labelled on the cluster 
+# 		number from original file.
+# '''
 
-def usage():
-	if len( sys.argv ) != 2 or sys.argv[ 1 ] == "-h":
-		print( usageMsg )
-		exit( 0 )
+# def usage():
+# 	if len( sys.argv ) != 2 or sys.argv[ 1 ] == "-h":
+# 		print( usageMsg )
+# 		exit( 0 )
 
 def parseHeader(header):
 	"""	check if input line is valid header.
@@ -91,12 +91,7 @@ def parseHeader(header):
 		headerInfo.append(temp[2].split(".")[0])	# GCF No
 		return headerInfo
 
-#-----------------------------------------------------------------------      
-#--------------------------- main --------------------------------------
-# check argument usage correctness
-usage()
-print("============= START ==================")
-alignedClusterFasta = sys.argv[ 1 ]
+alignedClusterFasta = sorted_fasta_file
 
 #----- open file -----
 try:
