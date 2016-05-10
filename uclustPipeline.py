@@ -12,6 +12,8 @@
 # 05/01/16
 import os
 import sys
+import glob
+import shutil
 import csv
 import re
 import numpy as np
@@ -21,26 +23,7 @@ import matplotlib.pyplot as plt
 fasta_file = sys.argv[1]
 min_percent = sys.argv[2]
 
-# Step 1: Sort FASTA file
-sorted_fasta_file = "sorted_" + fasta_file
-os.system("uclust --sort " + fasta_file + "--output " + sorted_fasta_file)
-
-# Step 2: Run sorted FASTA files for 95-100% identity
-fasta_file_id = fasta_file + "_id.uc"
-for p in range(min_percent, 100):
-	os.system("uclust --input " + sorted_fasta_file + "--uc " + fasta_file_id + " --id " + p)
-
-# Step 3: Sort Step 2 output
-sorted_fasta_file_clusters = sorted_fasta_file + "_clusters.fasta"
-os.system("uclust --sortuc " + fasta_file_id + " --input " + fasta_file + "--output " + sorted_fasta_file_id)
-
-# Step 4: .UC to .FASTA
-os.system("uclust --uc2fasta " + sorted_fasta_file + "--output " + sorted_fasta_file_clusters)
-
-# Step 5: Align the clusters
-os.system("uclust --staralign " + sorted_fasta_file + " --output " + sorted_fasta_file + "-aligned.fasta")
-
-# Step 6: Filter Output
+# Pipeline output
 # dataList: a dictionary to store the number of clusters with n genomes.
 dataList = {}
 # an output csv files as database
@@ -50,6 +33,33 @@ data_csv.writerow(["Cluster_NO", "GCF_host", "Number of members in cluster", "GC
 summary_csv = csv.writer(open('clustSummary.csv', "w"), lineterminator='\n')
 summary_csv.writerow(["num of members in one cluster", "num of clusters", "num of 100%ID", "num of 99%ID","num of 98%ID","num of 97%ID","num of 96%ID","num of 95%ID"])
 
+# Step 1: Sort FASTA file
+sorted_fasta_file = "sorted_" + fasta_file
+os.system("uclust --sort " + fasta_file + " --output " + sorted_fasta_file)
+# print("STEP ONE COMPLETE")
+
+# Step 2+: Run sorted FASTA files for 95-100% identity
+fasta_file_id = fasta_file[:-6] + "_id.uc"
+for p in range(int(min_percent), 100):
+	os.system("uclust --input " + sorted_fasta_file + " --uc " + fasta_file_id + " --id 0." + str(p))
+	# print("STEP TWO COMPLETE")
+
+	# Step 3: Sort Step 2 output
+	sorted_fasta_file_id = sorted_fasta_file[:-6] + "_id.uc"
+	os.system("uclust --sortuc " + fasta_file_id + " --output " + sorted_fasta_file_id)
+	# print("STEP THREE COMPLETE")
+
+	# Step 4: .UC to .FASTA
+	sorted_fasta_file_clusters = sorted_fasta_file[:-6] + "_clusters.fasta"
+	os.system("uclust --uc2fasta " + sorted_fasta_file_id + " --input " + fasta_file + " --output " + sorted_fasta_file_clusters)
+	# print("STEP FOUR COMPLETE")
+
+	# Step 5: Align the clusters
+	aligned_clusters = sorted_fasta_file[:-6] + "_aligned.fasta"
+	os.system("uclust --staralign " + sorted_fasta_file_clusters + " --output " + aligned_clusters)
+	# print("STEP FIVE COMPLETE")
+
+# Step 6: Filter Output
 class ClustData:
 	def __init__(self, no_of_mem, c):
 		self.numberOfMembers = no_of_mem
@@ -60,19 +70,6 @@ class ClustData:
 		self.count_98pcent = 0	# number of member with 98.0%~98.9%
 		self.count_99pcent = 0	# number of member with 99.0%~99.9%
 		self.count_100pcent = 0	# number of member with 100.0%
-
-
-# usageMsg = '''
-# Usage: genomePharser fastafile
-# 		Read a fasta file(result_aligned.fasta)and output each block that 
-# 		contains more than one genome into a separate file labelled on the cluster 
-# 		number from original file.
-# '''
-
-# def usage():
-# 	if len( sys.argv ) != 2 or sys.argv[ 1 ] == "-h":
-# 		print( usageMsg )
-# 		exit( 0 )
 
 def parseHeader(header):
 	"""	check if input line is valid header.
@@ -91,23 +88,23 @@ def parseHeader(header):
 		headerInfo.append(temp[2].split(".")[0])	# GCF No
 		return headerInfo
 
-alignedClusterFasta = sorted_fasta_file
-
-#----- open file -----
+# ----- open file -----
 try:
-    inFile = open( alignedClusterFasta, 'r' )
+    inFile = open( aligned_clusters, 'r' )
 except ( OSError, IOError ) as e:
-    print( 'Unable to open ', alignedClusterFasta )
+    print( 'Unable to open ', aligned_clusters )
 
-#----- read file and process -----
+# ----- read file and process -----
 # file format: 1 line header followed by 1 line sequence
 # every time reads 2 lines from the file(1 header and 1 seq line)
-
 header = inFile.readline()
 sequence = inFile.readline()
 curCLusterNo = "-1"
 GCFlist = []
 difflist = []
+clusterDir = "aligned_clusters"
+if not os.path.exists(clusterDir):
+	os.mkdir(clusterDir)
 
 while header != '' and sequence != '':
 	# parse header and get an string array[clusterNo, %, GCFNo]
@@ -131,7 +128,7 @@ while header != '' and sequence != '':
 		difflist.append(diffpercent)
 	
 	if diffpercent == '*':		# last line of cluster
-		print(".....processig cluster" + curCLusterNo)
+		print("...processing cluster" + curCLusterNo)
 		c_name = len(GCFlist)
 		if c_name in dataList:
 			dataList[c_name].count +=1
@@ -197,20 +194,26 @@ plt.plot(numberOfmem, diff_100, 'r-', label = "100%", lw=1)
 plt.plot(numberOfmem, diff_100, 'r-', label = "100%", lw=1)
 plt.plot(numberOfmem, diff_99, 'g-', label = "99%", lw=1)
 plt.plot(numberOfmem, diff_98, 'y-', label = "98%", lw=1)
-#plt.plot(numberOfmem, diff_97, 'm-', label = "97%", lw=1)
-#plt.plot(numberOfmem, diff_96, 'c-', label = "96%", lw=1)
-#plt.plot(numberOfmem, diff_95, 'b-', label = "95%", lw=1)
+plt.plot(numberOfmem, diff_97, 'm-', label = "97%", lw=1)
+plt.plot(numberOfmem, diff_96, 'c-', label = "96%", lw=1)
+plt.plot(numberOfmem, diff_95, 'b-', label = "95%", lw=1)
 plt.xlabel(r'number of members in one cluster')
 plt.ylabel(r'number of clusters)')
 plt.axis([1, np.amax(numberOfmem), 1, np.amax(clustercount)])
 
 plt.savefig("plot.pdf")
+
+# clean up directory
+curDir = os.getcwd()
+cluster_files = glob.iglob(os.path.join(curDir, "CLU*"))
+for cf in cluster_files:
+	if os.path.isfile(cf):
+		shutil.move(cf, clusterDir)
+# cluster_files = os.listdir(curDir)
+# for fn in cluster_files:
+# 	full_fn = os.path.join(curDir, fn)
+# 	if (os.path.isfile(full_fn)):
+# 		shutil.copy(full_fn, clusterDir)
 	
 print("============= FINISH ==================")
 inFile.close()
-
-
-
-
-
-
